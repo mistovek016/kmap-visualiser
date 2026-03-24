@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>K-map Visualiser</title>
+    <style>
+        body {
+            margin: 0;
+            background: #080811;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* Fixed Sidebar Layout */
+        #sidebar {
+            width: 360px;
+            flex-shrink: 0;
+            background: rgba(15, 23, 42, 0.95);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            overflow-y: auto;
+        }
+
+        /* 3D Viewport Area */
+        #viewport {
+            flex-grow: 1;
+            position: relative;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #080811 100%);
+        }
+
+        /* View & Zoom Controls */
+        #view-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+            pointer-events: auto;
+            user-select: none;
+            z-index: 20;
+        }
+
+        h2 {
+            margin: 0 0 8px 0;
+            font-size: 1.5rem;
+            color: #f8fafc;
+            letter-spacing: 0.5px;
+        }
+
+        p {
+            margin: 0 0 15px 0;
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            line-height: 1.4;
+        }
+
+        .section-label {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* Toggle Groups */
+        .toggle-group {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+
+        .topo-btn,
+        .var-btn {
+            flex: 1;
+            padding: 10px 5px;
+            font-size: 0.75rem;
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #94a3b8;
+            margin: 0;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .topo-btn:hover,
+        .var-btn:hover {
+            background: #334155;
+            color: white;
+        }
+
+        .active-btn {
+            background: #0ea5e9;
+            border-color: #38bdf8;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(14, 165, 233, 0.4);
+        }
+
+        /* The Dynamic Expression Box */
+        #expression-box {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #475569;
+            border-radius: 8px;
+            padding: 15px 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.6);
+            min-height: 45px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        #boolean-exp {
+            font-family: monospace;
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #38bdf8;
+            letter-spacing: 1px;
+        }
+
+        /* The Interactive 2D K-Map Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th,
+        td {
+            border: 1px solid #475569;
+            text-align: center;
+            padding: 10px 0;
+            font-family: monospace;
+        }
+
+        th {
+            background: rgba(15, 23, 42, 0.9);
+            color: #94a3b8;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .corner-th {
+            font-size: 0.7rem;
+            line-height: 1.1;
+        }
+
+        td {
+            background: rgba(30, 41, 59, 0.6);
+            cursor: pointer;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #fff;
+            transition: 0.15s;
+        }
+
+        td:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        td.active {
+            background: #eab308;
+            color: #000;
+            box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Standard Buttons */
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #334155;
+            color: white;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #475569;
+            border-color: #94a3b8;
+        }
+
+        .primary-btn {
+            background: #0284c7;
+            border-color: #0369a1;
+        }
+
+        .primary-btn:hover {
+            background: #0369a1;
+        }
+
+        #view-controls button {
+            width: auto;
+            margin: 0;
+            padding: 8px 14px;
+            font-size: 0.85rem;
+        }
+
+        .v-divider {
+            width: 1px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.2);
+            margin: 0 4px;
+        }
+
+        .zoom-btn {
+            font-size: 1.1rem;
+            padding: 4px 10px !important;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin: 15px 0;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: auto;
+            padding-top: 20px;
+            text-align: center;
+            color: #475569;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="sidebar">
+        <h2>K-map Visualiser</h2>
+        <p>Click the 3D model or 2D grid to toggle values.</p>
+
+        <span class="section-label">Variable Count</span>
+        <div class="toggle-group">
+            <button id="var-2" class="var-btn" onclick="setVarCount(2)">2 Variables</button>
+            <button id="var-3" class="var-btn" onclick="setVarCount(3)">3 Variables</button>
+            <button id="var-4" class="var-btn active-btn" onclick="setVarCount(4)">4 Variables</button>
+        </div>
+
+        <span class="section-label">3D Topology View</span>
+        <div class="toggle-group">
+            <button id="topo-torus" class="topo-btn active-btn" onclick="setTopology('torus')">Torus<br>(Full
+                Wrap)</button>
+            <button id="topo-lr" class="topo-btn" onclick="setTopology('lr')">Cylinder<br>(Left/Right)</button>
+            <button id="topo-tb" class="topo-btn" onclick="setTopology('tb')">Cylinder<br>(Top/Bottom)</button>
+        </div>
+
+        <div id="expression-box">
+            <span class="section-label" style="margin-bottom: 5px;">Simplified SOP Expression</span>
+            <span id="boolean-exp">F = 0</span>
+        </div>
+
+        <div id="table-container"></div>
+
+        <button class="primary-btn" onclick="setExample('clear')">Clear Map</button>
+        <hr>
+        <button onclick="setExample('corners')">Example: Corners Wrap</button>
+        <button onclick="setExample('edges')">Example: Edges Wrap</button>
+
+        <div class="footer">mistovek016<br>CS Dept. - The Hyderabad Public School, Begumpet</div>
+    </div>
+
+    <div id="viewport">
+        <div id="view-controls">
+            <button onclick="setView('top')">Top</button>
+            <button onclick="setView('front')">Front</button>
+            <button onclick="setView('side')">Side</button>
+            <button onclick="setView('iso')" class="primary-btn">Iso</button>
+            <div class="v-divider"></div>
+            <button class="zoom-btn" onclick="zoomCamera(0.8)" title="Zoom In">➕</button>
+            <button class="zoom-btn" onclick="zoomCamera(1.2)" title="Zoom Out">➖</button>
+        </div>
+    </div>
+
+    <script type="importmap">
+        { "imports": { 
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
+
+        const viewport = document.getElementById('viewport');
+
+        // --- 1. Scene Setup ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(55, viewport.clientWidth / viewport.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+        viewport.appendChild(renderer.domElement);
+
+        const controls = new TrackballControls(camera, renderer.domElement);
+        controls.rotateSpeed = 4.0; controls.zoomSpeed = 1.2; controls.panSpeed = 0.8;
+
+        // --- 2. View & Zoom Orientations ---
+        window.setView = (view) => {
+            if (view === 'front') camera.position.set(0, 0, 32);
+            if (view === 'top') camera.position.set(0, 32, 0.1);
+            if (view === 'side') camera.position.set(32, 0, 0);
+            if (view === 'iso') camera.position.set(16, 18, 26);
+            camera.up.set(0, 1, 0);
+            controls.target.set(0, 0, 0);
+            camera.lookAt(0, 0, 0);
+        };
+        window.zoomCamera = (factor) => { camera.position.multiplyScalar(factor); };
+        setView('iso');
+
+        // --- 3. Dynamic Variables & Data Structures ---
+        let varCount = 4;
+        let rows = 4, cols = 4;
+        let kmap = [];
+
+        // Correct Gray Code Maps
+        const maps = {
+            2: [[0, 1], [2, 3]],
+            3: [[0, 1, 3, 2], [4, 5, 7, 6]],
+            4: [[0, 1, 3, 2], [4, 5, 7, 6], [12, 13, 15, 14], [8, 9, 11, 10]]
+        };
+
+        window.setVarCount = (v) => {
+            varCount = v;
+            rows = (v === 2) ? 2 : (v === 3) ? 2 : 4;
+            cols = (v === 2) ? 2 : (v === 3) ? 4 : 4;
+
+            kmap = Array(rows).fill().map(() => Array(cols).fill(0));
+
+            document.querySelectorAll('.var-btn').forEach(b => b.classList.remove('active-btn'));
+            document.getElementById('var-' + v).classList.add('active-btn');
+
+            renderHTMLTable();
+            updateAll();
+        };
+
+        // --- 4. Logic Solver (Dynamic Quine-McCluskey) ---
+        function solveBoolean() {
+            const minterms = [];
+            for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+                if (kmap[r][c] === 1) {
+                    let mintermVal = maps[varCount][r][c];
+                    minterms.push(mintermVal.toString(2).padStart(varCount, '0'));
+                }
+            }
+            if (minterms.length === 0) return "0";
+            if (minterms.length === (1 << varCount)) return "1";
+
+            let groups = [minterms]; let primeImplicants = new Set(); let combined = new Set();
+            while (groups[groups.length - 1].length > 0) {
+                let current = groups[groups.length - 1]; let nextGroup = new Set(); combined.clear();
+                for (let i = 0; i < current.length; i++) for (let j = i + 1; j < current.length; j++) {
+                    let s1 = current[i], s2 = current[j], diff = 0, diffIdx = -1;
+                    for (let k = 0; k < varCount; k++) if (s1[k] !== s2[k]) { diff++; diffIdx = k; }
+                    if (diff === 1) {
+                        nextGroup.add(s1.substring(0, diffIdx) + '-' + s1.substring(diffIdx + 1));
+                        combined.add(s1); combined.add(s2);
+                    }
+                }
+                for (let term of current) if (!combined.has(term)) primeImplicants.add(term);
+                groups.push(Array.from(nextGroup));
+            }
+
+            let pis = Array.from(primeImplicants), chart = {};
+            for (let m of minterms) {
+                chart[m] = [];
+                for (let pi of pis) {
+                    let match = true;
+                    for (let k = 0; k < varCount; k++) if (pi[k] !== '-' && pi[k] !== m[k]) match = false;
+                    if (match) chart[m].push(pi);
+                }
+            }
+
+            let essentials = new Set(), covered = new Set();
+            for (let m of minterms) if (chart[m].length === 1) {
+                let epi = chart[m][0]; essentials.add(epi);
+                for (let m2 of minterms) if (chart[m2].includes(epi)) covered.add(m2);
+            }
+
+            let remPis = pis.filter(pi => !essentials.has(pi)), remMinterms = minterms.filter(m => !covered.has(m));
+            while (remMinterms.length > 0) {
+                let best = null, max = 0;
+                for (let pi of remPis) {
+                    let cov = remMinterms.filter(m => chart[m].includes(pi)).length;
+                    if (cov > max) { max = cov; best = pi; }
+                }
+                if (best) {
+                    essentials.add(best);
+                    remMinterms = remMinterms.filter(m => !chart[m].includes(best));
+                    remPis = remPis.filter(pi => pi !== best);
+                } else break;
+            }
+
+            let terms = Array.from(essentials).map(pi => {
+                let str = '';
+                if (pi[0] === '0') str += "A'"; else if (pi[0] === '1') str += "A";
+                if (pi[1] === '0') str += "B'"; else if (pi[1] === '1') str += "B";
+                if (varCount > 2) { if (pi[2] === '0') str += "C'"; else if (pi[2] === '1') str += "C"; }
+                if (varCount > 3) { if (pi[3] === '0') str += "D'"; else if (pi[3] === '1') str += "D"; }
+                return str === '' ? '1' : str;
+            });
+            return terms.join(" + ");
+        }
+
+        // --- 5. UI rendering & Canvas ---
+        const size = 2048;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const geometryStretch = 2.513; // Mathematically fixed stretch of Torus(10,4)
+
+        function renderHTMLTable() {
+            const container = document.getElementById('table-container');
+            let html = '<table>';
+            if (varCount === 2) {
+                html += `<tr><th class="corner-th">A \\ B</th><th>0</th><th>1</th></tr>`;
+                for (let r = 0; r < 2; r++) { html += `<tr><th>${r}</th><td id="cell-${r}-0">0</td><td id="cell-${r}-1">0</td></tr>`; }
+            } else if (varCount === 3) {
+                html += `<tr><th class="corner-th">A \\ BC</th><th>00</th><th>01</th><th>11</th><th>10</th></tr>`;
+                for (let r = 0; r < 2; r++) { html += `<tr><th>${r}</th><td id="cell-${r}-0">0</td><td id="cell-${r}-1">0</td><td id="cell-${r}-2">0</td><td id="cell-${r}-3">0</td></tr>`; }
+            } else {
+                html += `<tr><th class="corner-th">AB \\ CD</th><th>00</th><th>01</th><th>11</th><th>10</th></tr>`;
+                const rH = ['00', '01', '11', '10'];
+                for (let r = 0; r < 4; r++) { html += `<tr><th>${rH[r]}</th><td id="cell-${r}-0">0</td><td id="cell-${r}-1">0</td><td id="cell-${r}-2">0</td><td id="cell-${r}-3">0</td></tr>`; }
+            }
+            container.innerHTML = html + '</table>';
+
+            // Bind Clicks
+            for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+                document.getElementById(`cell-${r}-${c}`).addEventListener('click', () => {
+                    kmap[r][c] ^= 1; updateAll();
+                });
+            }
+        }
+
+        function updateAll() {
+            const cellW = size / cols; const cellH = size / rows;
+            const textStretchX = geometryStretch * (rows / cols);
+
+            ctx.clearRect(0, 0, size, size);
+
+            for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+                const isOne = kmap[row][col] === 1;
+
+                // Background & Grid
+                ctx.fillStyle = isOne ? '#eab308' : '#1e293b';
+                ctx.fillRect(col * cellW, row * cellH, cellW, cellH);
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(0, row * cellH, size, 14); ctx.fillRect(col * cellW, 0, 35, size);
+
+                // Value (1 or 0)
+                ctx.fillStyle = isOne ? '#000000' : '#ffffff';
+                ctx.font = `bold ${varCount === 2 ? 400 : 240}px monospace`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+                ctx.save(); ctx.scale(1 / textStretchX, 1);
+                ctx.fillText(isOne ? '1' : '0', (col * cellW + cellW / 2) * textStretchX, row * cellH + cellH / 2);
+                ctx.restore();
+
+                // Minterm Index
+                ctx.fillStyle = isOne ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.4)';
+                ctx.font = `bold ${varCount === 2 ? 100 : 70}px sans-serif`;
+                ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+
+                ctx.save(); ctx.scale(1 / textStretchX, 1);
+                ctx.fillText(maps[varCount][row][col], (col * cellW + 45) * textStretchX, row * cellH + 35);
+                ctx.restore();
+
+                const td = document.getElementById(`cell-${row}-${col}`);
+                if (td) {
+                    td.innerText = isOne ? '1' : '0';
+                    if (isOne) td.classList.add('active'); else td.classList.remove('active');
+                }
+            }
+            document.getElementById('boolean-exp').innerText = "F = " + solveBoolean();
+            if (texture) texture.needsUpdate = true;
+        }
+
+        // --- 6. Geometries & Topologies ---
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+        // Material for the outer surface with the K-Map texture. Default is FrontSide.
+        const material = new THREE.MeshBasicMaterial({ map: texture });
+
+        // Blank, dark inner material to create a solid hollow tube effect
+        const innerMaterial = new THREE.MeshBasicMaterial({ color: 0x0f172a, side: THREE.BackSide });
+
+        // 1. Torus (Rotated into XZ plane so "Top" looks down the hole)
+        const torusGeo = new THREE.TorusGeometry(10, 4, 64, 100);
+        torusGeo.rotateX(Math.PI / 2);
+
+        // 2. L/R Cylinder
+        const lrGeo = new THREE.CylinderGeometry(10, 10, 25.13, 64, 4, true);
+
+        // 3. T/B Cylinder (Perfectly mapped to ensure text is upright!)
+        const tbGeo = new THREE.CylinderGeometry(4, 4, 62.83, 64, 4, true);
+        const tbUvs = tbGeo.attributes.uv;
+        for (let i = 0; i < tbUvs.count; i++) {
+            let u = tbUvs.getX(i), v = tbUvs.getY(i);
+            // v becomes X (length), 1-u becomes Y (circumference). This mathematically forces text to stand up!
+            tbUvs.setXY(i, v, 1 - u);
+        }
+        tbGeo.rotateZ(-Math.PI / 2); // Lie horizontal
+
+        let currentGroup = null;
+        let raycastTarget = null; // We only want to raycast the outer textured layer
+
+        window.setTopology = (type) => {
+            if (currentGroup) scene.remove(currentGroup);
+            currentGroup = new THREE.Group();
+
+            let geo;
+            if (type === 'torus') geo = torusGeo;
+            else if (type === 'lr') geo = lrGeo;
+            else if (type === 'tb') geo = tbGeo;
+
+            raycastTarget = new THREE.Mesh(geo, material);
+            const innerMesh = new THREE.Mesh(geo, innerMaterial);
+
+            // Scaling inner mesh down by a tiny fraction prevents Z-fighting completely
+            innerMesh.scale.set(0.99, 0.99, 0.99);
+
+            currentGroup.add(raycastTarget);
+            currentGroup.add(innerMesh);
+            scene.add(currentGroup);
+
+            document.querySelectorAll('.topo-btn').forEach(b => b.classList.remove('active-btn'));
+            document.getElementById('topo-' + type).classList.add('active-btn');
+        };
+
+        // --- 7. Raycasting & Events ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        viewport.addEventListener('click', (e) => {
+            // Ignore UI clicks
+            if (e.target.closest('#view-controls')) return;
+
+            const rect = viewport.getBoundingClientRect();
+            mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObject(raycastTarget);
+            if (intersects.length > 0) {
+                const uv = intersects[0].uv;
+                let col, row;
+
+                const activeTopo = document.querySelector('.topo-btn.active-btn').id;
+                if (activeTopo === 'topo-tb') {
+                    col = Math.floor(uv.x * cols); // Length
+                    row = Math.floor((1 - uv.y) * rows); // Circumference
+                } else {
+                    col = Math.floor(uv.x * cols);
+                    row = Math.floor((1 - uv.y) * rows);
+                }
+
+                if (row >= 0 && row < rows && col >= 0 && col < cols) {
+                    kmap[row][col] ^= 1; updateAll();
+                }
+            }
+        });
+
+        window.setExample = (type) => {
+            for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) kmap[r][c] = 0;
+            if (type === 'corners') {
+                kmap[0][0] = 1; kmap[0][cols - 1] = 1; kmap[rows - 1][0] = 1; kmap[rows - 1][cols - 1] = 1;
+            }
+            if (type === 'edges') {
+                if (varCount === 2) { kmap[0][0] = 1; kmap[1][0] = 1; } // Col 0
+                else { kmap[0][0] = 1; kmap[1][0] = 1; kmap[0][cols - 1] = 1; kmap[1][cols - 1] = 1; }
+            }
+            updateAll();
+        };
+
+        // Initialize Everything
+        setVarCount(4);
+        setTopology('torus');
+
+        // --- 8. Render Loop & Resize ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            const width = viewport.clientWidth;
+            const height = viewport.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            controls.handleResize();
+        });
+    </script>
+</body>
+
+</html>
