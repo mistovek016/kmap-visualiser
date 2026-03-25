@@ -18,7 +18,7 @@
 
         /* Fixed Sidebar Layout */
         #sidebar {
-            width: 360px;
+            width: 380px;
             flex-shrink: 0;
             background: rgba(15, 23, 42, 0.95);
             border-right: 1px solid rgba(255, 255, 255, 0.1);
@@ -89,14 +89,15 @@
         .topo-btn,
         .var-btn {
             flex: 1;
-            padding: 10px 5px;
-            font-size: 0.75rem;
+            padding: 10px 4px;
+            font-size: 0.72rem;
             background: #1e293b;
             border: 1px solid #334155;
             color: #94a3b8;
             margin: 0;
             cursor: pointer;
             border-radius: 4px;
+            text-align: center;
         }
 
         .topo-btn:hover,
@@ -188,7 +189,7 @@
         /* Standard Buttons */
         button {
             width: 100%;
-            padding: 12px;
+            padding: 10px;
             margin-bottom: 8px;
             background: #334155;
             color: white;
@@ -238,15 +239,16 @@
             margin: 15px 0;
         }
 
-        /* Footer */
+        /* Custom Footer */
         .footer {
             margin-top: auto;
             padding-top: 20px;
             text-align: center;
-            color: #475569;
+            color: #64748b;
             font-size: 0.75rem;
             font-weight: 600;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -255,7 +257,6 @@
 
     <div id="sidebar">
         <h2>K-map Visualiser</h2>
-        <p>Click the 3D model or 2D grid to toggle values.</p>
 
         <span class="section-label">Variable Count</span>
         <div class="toggle-group">
@@ -265,11 +266,22 @@
         </div>
 
         <span class="section-label">3D Topology View</span>
-        <div class="toggle-group">
-            <button id="topo-torus" class="topo-btn active-btn" onclick="setTopology('torus')">Torus<br>(Full
-                Wrap)</button>
+        <div class="toggle-group" style="flex-wrap: wrap;">
+            <button id="topo-plane" class="topo-btn active-btn" onclick="setTopology('plane')">Plane<br>(Flat)</button>
             <button id="topo-lr" class="topo-btn" onclick="setTopology('lr')">Cylinder<br>(Left/Right)</button>
-            <button id="topo-tb" class="topo-btn" onclick="setTopology('tb')">Cylinder<br>(Top/Bottom)</button>
+            <button id="topo-tb" class="topo-btn" onclick="setTopology('tb')">Cylinder<br>(Top/Bot)</button>
+            <button id="topo-torus" class="topo-btn" onclick="setTopology('torus')">Torus<br>(Full Wrap)</button>
+        </div>
+
+        <button id="btn-grid" class="primary-btn" onclick="toggleGrid()" style="margin-bottom: 20px;">Toggle 3D
+            Grid</button>
+
+        <div style="margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <span class="section-label" style="margin-bottom: 0;">Animation Speed</span>
+                <span id="speed-val" style="font-size: 0.75rem; color: #94a3b8; font-weight: bold;">1.0x</span>
+            </div>
+            <input type="range" id="anim-speed" min="1" max="100" value="75" style="width: 100%; cursor: pointer;" oninput="document.getElementById('speed-val').innerText = (this.value / 75).toFixed(1) + 'x'">
         </div>
 
         <div id="expression-box">
@@ -284,7 +296,10 @@
         <button onclick="setExample('corners')">Example: Corners Wrap</button>
         <button onclick="setExample('edges')">Example: Edges Wrap</button>
 
-        <div class="footer">mistovek016<br>CS Dept. - The Hyderabad Public School, Begumpet</div>
+        <div class="footer">
+            mistovek016 - 2026<br>
+            CS Dept. - The Hyderabad Public School, Begumpet&copy;
+        </div>
     </div>
 
     <div id="viewport">
@@ -322,12 +337,44 @@
         const controls = new TrackballControls(camera, renderer.domElement);
         controls.rotateSpeed = 4.0; controls.zoomSpeed = 1.2; controls.panSpeed = 0.8;
 
-        // --- 2. View & Zoom Orientations ---
+        // --- 2. Translucent Coordinate Axis Grid (Desmos Style) ---
+        const gridGroup = new THREE.Group();
+        const gridColor = 0x0ea5e9; const gridBase = 0x334155;
+
+        const gridXZ = new THREE.GridHelper(100, 40, gridColor, gridBase);
+        gridXZ.material.transparent = true; gridXZ.material.opacity = 0.15;
+        gridGroup.add(gridXZ);
+
+        const gridXY = new THREE.GridHelper(100, 40, gridColor, gridBase);
+        gridXY.rotation.x = Math.PI / 2;
+        gridXY.material.transparent = true; gridXY.material.opacity = 0.15;
+        gridGroup.add(gridXY);
+
+        const gridYZ = new THREE.GridHelper(100, 40, gridColor, gridBase);
+        gridYZ.rotation.z = Math.PI / 2;
+        gridYZ.material.transparent = true; gridYZ.material.opacity = 0.15;
+        gridGroup.add(gridYZ);
+
+        const axesHelper = new THREE.AxesHelper(30);
+        axesHelper.material.transparent = true; axesHelper.material.opacity = 0.6;
+        gridGroup.add(axesHelper);
+
+        scene.add(gridGroup);
+        let gridVisible = true;
+
+        window.toggleGrid = () => {
+            gridVisible = !gridVisible;
+            gridGroup.visible = gridVisible;
+            const btn = document.getElementById('btn-grid');
+            if (gridVisible) btn.classList.add('primary-btn'); else btn.classList.remove('primary-btn');
+        };
+
+        // --- 3. View & Zoom Orientations ---
         window.setView = (view) => {
-            if (view === 'front') camera.position.set(0, 0, 32);
-            if (view === 'top') camera.position.set(0, 32, 0.1);
-            if (view === 'side') camera.position.set(32, 0, 0);
-            if (view === 'iso') camera.position.set(16, 18, 26);
+            if (view === 'front') camera.position.set(0, 0, 40);
+            if (view === 'top') camera.position.set(0, 40, 0.1);
+            if (view === 'side') camera.position.set(40, 0, 0);
+            if (view === 'iso') camera.position.set(22, 24, 30);
             camera.up.set(0, 1, 0);
             controls.target.set(0, 0, 0);
             camera.lookAt(0, 0, 0);
@@ -335,12 +382,11 @@
         window.zoomCamera = (factor) => { camera.position.multiplyScalar(factor); };
         setView('iso');
 
-        // --- 3. Dynamic Variables & Data Structures ---
+        // --- 4. Dynamic Variables & Data Structures ---
         let varCount = 4;
         let rows = 4, cols = 4;
         let kmap = [];
 
-        // Correct Gray Code Maps
         const maps = {
             2: [[0, 1], [2, 3]],
             3: [[0, 1, 3, 2], [4, 5, 7, 6]],
@@ -351,24 +397,17 @@
             varCount = v;
             rows = (v === 2) ? 2 : (v === 3) ? 2 : 4;
             cols = (v === 2) ? 2 : (v === 3) ? 4 : 4;
-
             kmap = Array(rows).fill().map(() => Array(cols).fill(0));
-
             document.querySelectorAll('.var-btn').forEach(b => b.classList.remove('active-btn'));
             document.getElementById('var-' + v).classList.add('active-btn');
-
-            renderHTMLTable();
-            updateAll();
+            renderHTMLTable(); updateAll();
         };
 
-        // --- 4. Logic Solver (Dynamic Quine-McCluskey) ---
+        // --- 5. Quine-McCluskey Logic Solver ---
         function solveBoolean() {
             const minterms = [];
             for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-                if (kmap[r][c] === 1) {
-                    let mintermVal = maps[varCount][r][c];
-                    minterms.push(mintermVal.toString(2).padStart(varCount, '0'));
-                }
+                if (kmap[r][c] === 1) minterms.push(maps[varCount][r][c].toString(2).padStart(varCount, '0'));
             }
             if (minterms.length === 0) return "0";
             if (minterms.length === (1 << varCount)) return "1";
@@ -429,34 +468,32 @@
             return terms.join(" + ");
         }
 
-        // --- 5. UI rendering & Canvas ---
+        // --- 6. UI rendering & Canvas ---
         const size = 2048;
         const canvas = document.createElement('canvas');
         canvas.width = size; canvas.height = size;
         const ctx = canvas.getContext('2d');
-        const geometryStretch = 2.513; // Mathematically fixed stretch of Torus(10,4)
+        const R = 10, r = 4;
+        const geometryStretch = R / r; // Aspect ratio of the unfolded paper (10/4 = 2.5)
 
         function renderHTMLTable() {
             const container = document.getElementById('table-container');
             let html = '<table>';
             if (varCount === 2) {
                 html += `<tr><th class="corner-th">A \\ B</th><th>0</th><th>1</th></tr>`;
-                for (let r = 0; r < 2; r++) { html += `<tr><th>${r}</th><td id="cell-${r}-0">0</td><td id="cell-${r}-1">0</td></tr>`; }
+                for (let r = 0; r < 2; r++) html += `<tr><th>${r}</th><td id="cell-${r}-0">0</td><td id="cell-${r}-1">0</td></tr>`;
             } else if (varCount === 3) {
                 html += `<tr><th class="corner-th">A \\ BC</th><th>00</th><th>01</th><th>11</th><th>10</th></tr>`;
-                for (let r = 0; r < 2; r++) { html += `<tr><th>${r}</th><td id="cell-${r}-0">0</td><td id="cell-${r}-1">0</td><td id="cell-${r}-2">0</td><td id="cell-${r}-3">0</td></tr>`; }
+                for (let r = 0; r < 2; r++) html += `<tr><th>${r}</th><td id="cell-${r}-0">0</td><td id="cell-${r}-1">0</td><td id="cell-${r}-2">0</td><td id="cell-${r}-3">0</td></tr>`;
             } else {
                 html += `<tr><th class="corner-th">AB \\ CD</th><th>00</th><th>01</th><th>11</th><th>10</th></tr>`;
                 const rH = ['00', '01', '11', '10'];
-                for (let r = 0; r < 4; r++) { html += `<tr><th>${rH[r]}</th><td id="cell-${r}-0">0</td><td id="cell-${r}-1">0</td><td id="cell-${r}-2">0</td><td id="cell-${r}-3">0</td></tr>`; }
+                for (let r = 0; r < 4; r++) html += `<tr><th>${rH[r]}</th><td id="cell-${r}-0">0</td><td id="cell-${r}-1">0</td><td id="cell-${r}-2">0</td><td id="cell-${r}-3">0</td></tr>`;
             }
             container.innerHTML = html + '</table>';
 
-            // Bind Clicks
             for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-                document.getElementById(`cell-${r}-${c}`).addEventListener('click', () => {
-                    kmap[r][c] ^= 1; updateAll();
-                });
+                document.getElementById(`cell-${r}-${c}`).addEventListener('click', () => { kmap[r][c] ^= 1; updateAll(); });
             }
         }
 
@@ -469,22 +506,20 @@
             for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
                 const isOne = kmap[row][col] === 1;
 
-                // Background & Grid
                 ctx.fillStyle = isOne ? '#eab308' : '#1e293b';
                 ctx.fillRect(col * cellW, row * cellH, cellW, cellH);
                 ctx.fillStyle = '#0f172a';
-                ctx.fillRect(0, row * cellH, size, 14); ctx.fillRect(col * cellW, 0, 35, size);
+                ctx.fillRect(0, row * cellH, size, 14);
+                ctx.fillRect(col * cellW, 0, 14 * textStretchX, size);
 
-                // Value (1 or 0)
                 ctx.fillStyle = isOne ? '#000000' : '#ffffff';
-                ctx.font = `bold ${varCount === 2 ? 400 : 240}px monospace`;
+                ctx.font = `bold ${varCount === 2 ? 400 : 240}px Arial`;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
                 ctx.save(); ctx.scale(1 / textStretchX, 1);
-                ctx.fillText(isOne ? '1' : '0', (col * cellW + cellW / 2) * textStretchX, row * cellH + cellH / 2);
+                ctx.fillText(isOne ? '1' : '0', (col * cellW + cellW / 2) * textStretchX, row * cellH + cellH / 2 + 10);
                 ctx.restore();
 
-                // Minterm Index
                 ctx.fillStyle = isOne ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.4)';
                 ctx.font = `bold ${varCount === 2 ? 100 : 70}px sans-serif`;
                 ctx.textAlign = 'left'; ctx.textBaseline = 'top';
@@ -494,74 +529,96 @@
                 ctx.restore();
 
                 const td = document.getElementById(`cell-${row}-${col}`);
-                if (td) {
-                    td.innerText = isOne ? '1' : '0';
-                    if (isOne) td.classList.add('active'); else td.classList.remove('active');
-                }
+                if (td) { td.innerText = isOne ? '1' : '0'; if (isOne) td.classList.add('active'); else td.classList.remove('active'); }
             }
             document.getElementById('boolean-exp').innerText = "F = " + solveBoolean();
             if (texture) texture.needsUpdate = true;
         }
 
-        // --- 6. Geometries & Topologies ---
+        // --- 7. The Morphing Mathematical Engine ---
         const texture = new THREE.CanvasTexture(canvas);
         texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
-        // Material for the outer surface with the K-Map texture. Default is FrontSide.
-        const material = new THREE.MeshBasicMaterial({ map: texture });
+        // Use a highly subdivided flat plane as our base object
+        const morphedGeo = new THREE.PlaneGeometry(1, 1, 120, 120);
 
-        // Blank, dark inner material to create a solid hollow tube effect
+        const material = new THREE.MeshBasicMaterial({ map: texture });
         const innerMaterial = new THREE.MeshBasicMaterial({ color: 0x0f172a, side: THREE.BackSide });
 
-        // 1. Torus (Rotated into XZ plane so "Top" looks down the hole)
-        const torusGeo = new THREE.TorusGeometry(10, 4, 64, 100);
-        torusGeo.rotateX(Math.PI / 2);
+        const raycastTarget = new THREE.Mesh(morphedGeo, material);
+        const innerMesh = new THREE.Mesh(morphedGeo, innerMaterial);
 
-        // 2. L/R Cylinder
-        const lrGeo = new THREE.CylinderGeometry(10, 10, 25.13, 64, 4, true);
+        // Scale inner mesh to perfectly hide the inside without clipping
+        innerMesh.scale.set(0.995, 0.995, 0.995);
+        scene.add(raycastTarget);
+        scene.add(innerMesh);
 
-        // 3. T/B Cylinder (Perfectly mapped to ensure text is upright!)
-        const tbGeo = new THREE.CylinderGeometry(4, 4, 62.83, 64, 4, true);
-        const tbUvs = tbGeo.attributes.uv;
-        for (let i = 0; i < tbUvs.count; i++) {
-            let u = tbUvs.getX(i), v = tbUvs.getY(i);
-            // v becomes X (length), 1-u becomes Y (circumference). This mathematically forces text to stand up!
-            tbUvs.setXY(i, v, 1 - u);
+        // Morph Targets (0 = Flat, 1 = Folded)
+        let current_wu = 0, current_wv = 0;
+        let target_wu = 0, target_wv = 0;
+
+        // Parametric Equation for Smooth Folding
+        function getParametricPosition(u, v, wu, wv) {
+            const Lu = 2 * Math.PI * R;
+            const Lv = 2 * Math.PI * r;
+
+            let cy, cz_tube;
+            if (wv > 0.0001) {
+                let phi = (v - 0.5) * 2 * Math.PI * wv;
+                let radius_v = r / wv;
+                cy = radius_v * Math.sin(phi);
+                cz_tube = radius_v * Math.cos(phi) - radius_v; // Bends backwards into -Z
+            } else {
+                cy = (v - 0.5) * Lv; // Flat Y
+                cz_tube = 0;
+            }
+
+            let cx, cz;
+            if (wu > 0.0001) {
+                let theta = (u - 0.5) * 2 * Math.PI * wu;
+                let radius_u = R / wu;
+                let total_r = radius_u + cz_tube;
+                cx = total_r * Math.sin(theta);
+                cz = total_r * Math.cos(theta) - radius_u; // Bends backwards into -Z
+            } else {
+                cx = (u - 0.5) * Lu; // Flat X
+                cz = cz_tube;
+            }
+            return { x: cx, y: cy, z: cz };
         }
-        tbGeo.rotateZ(-Math.PI / 2); // Lie horizontal
 
-        let currentGroup = null;
-        let raycastTarget = null; // We only want to raycast the outer textured layer
+        function updateMorphGeometry() {
+            const positions = morphedGeo.attributes.position;
+            const uvs = morphedGeo.attributes.uv;
+            for (let i = 0; i < positions.count; i++) {
+                let u = uvs.getX(i);
+                let v = uvs.getY(i);
+                // Three.js CanvasTexture already flips Y automatically (flipY=true).
+                // DO NOT invert v, or else the 3D plane will render upside down!
+                let pos = getParametricPosition(u, v, current_wu, current_wv);
+                positions.setXYZ(i, pos.x, pos.y, pos.z);
+            }
+            positions.needsUpdate = true;
+            morphedGeo.computeVertexNormals();
+            morphedGeo.computeBoundingSphere(); // Critical for raycasting to work mid-animation
+            morphedGeo.computeBoundingBox();
+        }
 
         window.setTopology = (type) => {
-            if (currentGroup) scene.remove(currentGroup);
-            currentGroup = new THREE.Group();
-
-            let geo;
-            if (type === 'torus') geo = torusGeo;
-            else if (type === 'lr') geo = lrGeo;
-            else if (type === 'tb') geo = tbGeo;
-
-            raycastTarget = new THREE.Mesh(geo, material);
-            const innerMesh = new THREE.Mesh(geo, innerMaterial);
-
-            // Scaling inner mesh down by a tiny fraction prevents Z-fighting completely
-            innerMesh.scale.set(0.99, 0.99, 0.99);
-
-            currentGroup.add(raycastTarget);
-            currentGroup.add(innerMesh);
-            scene.add(currentGroup);
+            if (type === 'plane') { target_wu = 0; target_wv = 0; }
+            if (type === 'lr') { target_wu = 1; target_wv = 0; }
+            if (type === 'tb') { target_wu = 0; target_wv = 1; }
+            if (type === 'torus') { target_wu = 1; target_wv = 1; }
 
             document.querySelectorAll('.topo-btn').forEach(b => b.classList.remove('active-btn'));
             document.getElementById('topo-' + type).classList.add('active-btn');
         };
 
-        // --- 7. Raycasting & Events ---
+        // --- 8. Raycasting & Events ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
         viewport.addEventListener('click', (e) => {
-            // Ignore UI clicks
             if (e.target.closest('#view-controls')) return;
 
             const rect = viewport.getBoundingClientRect();
@@ -572,16 +629,9 @@
             const intersects = raycaster.intersectObject(raycastTarget);
             if (intersects.length > 0) {
                 const uv = intersects[0].uv;
-                let col, row;
-
-                const activeTopo = document.querySelector('.topo-btn.active-btn').id;
-                if (activeTopo === 'topo-tb') {
-                    col = Math.floor(uv.x * cols); // Length
-                    row = Math.floor((1 - uv.y) * rows); // Circumference
-                } else {
-                    col = Math.floor(uv.x * cols);
-                    row = Math.floor((1 - uv.y) * rows);
-                }
+                // Because we use one plane, UVs NEVER change regardless of 3D shape!
+                let col = Math.min(cols - 1, Math.floor(uv.x * cols));
+                let row = Math.min(rows - 1, Math.floor((1 - uv.y) * rows));
 
                 if (row >= 0 && row < rows && col >= 0 && col < cols) {
                     kmap[row][col] ^= 1; updateAll();
@@ -595,7 +645,7 @@
                 kmap[0][0] = 1; kmap[0][cols - 1] = 1; kmap[rows - 1][0] = 1; kmap[rows - 1][cols - 1] = 1;
             }
             if (type === 'edges') {
-                if (varCount === 2) { kmap[0][0] = 1; kmap[1][0] = 1; } // Col 0
+                if (varCount === 2) { kmap[0][0] = 1; kmap[1][0] = 1; }
                 else { kmap[0][0] = 1; kmap[1][0] = 1; kmap[0][cols - 1] = 1; kmap[1][cols - 1] = 1; }
             }
             updateAll();
@@ -603,11 +653,27 @@
 
         // Initialize Everything
         setVarCount(4);
-        setTopology('torus');
+        setTopology('plane'); // Default view
+        updateMorphGeometry();
 
-        // --- 8. Render Loop & Resize ---
+        // --- 9. Animation & Render Loop ---
+        const speedSlider = document.getElementById('anim-speed');
+
         function animate() {
             requestAnimationFrame(animate);
+
+            // Smooth "3b1b" style easing
+            let needsMorph = false;
+            const ease = 0.08 * (speedSlider.value / 75);
+            if (Math.abs(target_wu - current_wu) > 0.001) {
+                current_wu += (target_wu - current_wu) * ease; needsMorph = true;
+            }
+            if (Math.abs(target_wv - current_wv) > 0.001) {
+                current_wv += (target_wv - current_wv) * ease; needsMorph = true;
+            }
+
+            if (needsMorph) updateMorphGeometry();
+
             controls.update();
             renderer.render(scene, camera);
         }
